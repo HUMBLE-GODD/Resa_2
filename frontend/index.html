@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RESA_AI Workspace</title>
+  <link rel="stylesheet" href="/frontend/styles.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="#top">
+        <span class="brand-mark">R</span>
+        <span>
+          <strong>RESA_AI</strong>
+          <small>Math Research Intelligence</small>
+        </span>
+      </a>
+      <nav class="topnav">
+        <a href="#overview">Overview</a>
+        <a href="#pipeline">Pipeline</a>
+        <a href="#analysis">Analysis</a>
+      </nav>
+      <button class="ghost-button" id="loadDemoButton" type="button">Load Latest Analysis</button>
+    </header>
+
+    <main>
+      <section class="hero card" id="top">
+        <div class="hero-copy">
+          <p class="eyebrow">Research Analysis Workspace</p>
+          <h1>Turn dense mathematical papers into a guided intelligence report.</h1>
+          <p class="hero-text">
+            Upload a PDF, follow each NLP and AI stage in real time, and explore the final analysis
+            through a calmer, report-first interface.
+          </p>
+          <div class="hero-metrics" id="heroMetrics"></div>
+        </div>
+        <div class="hero-panel">
+          <div class="upload-panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Start Analysis</p>
+                <h2>Upload a research paper</h2>
+              </div>
+              <span class="status-pill" id="heroStatus">Ready</span>
+            </div>
+            <form id="uploadForm" class="upload-dropzone">
+              <input id="fileInput" name="paper" type="file" accept="application/pdf" hidden>
+              <button class="dropzone-inner" id="filePicker" type="button">
+                <span class="upload-icon">↑</span>
+                <strong>Drop your PDF here</strong>
+                <span>or browse from your device</span>
+              </button>
+            </form>
+            <div class="file-row hidden" id="fileRow">
+              <div class="file-meta">
+                <span class="file-badge">PDF</span>
+                <div>
+                  <strong id="fileName">No file selected</strong>
+                  <small id="fileDetails">Upload a mathematical research paper</small>
+                </div>
+              </div>
+              <button class="primary-button" id="analyzeButton" type="button">Analyze Paper</button>
+            </div>
+            <div class="pipeline-status hidden" id="pipelineStatus">
+              <div class="pipeline-progress">
+                <div class="pipeline-progress-bar" id="pipelineProgressBar"></div>
+              </div>
+              <div class="pipeline-caption">
+                <strong id="pipelineLabel">Waiting to start</strong>
+                <span id="pipelineHint">The system will move through parsing, NLP, models, and report generation.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="pipeline-grid" id="pipeline">
+        <aside class="pipeline-sidebar card">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Guided Flow</p>
+              <h2>Processing Timeline</h2>
+            </div>
+          </div>
+          <div class="phase-list" id="phaseList"></div>
+        </aside>
+
+        <section class="workspace">
+          <div class="workspace-head card" id="overview">
+            <div>
+              <p class="eyebrow">Analysis Workspace</p>
+              <h2 id="paperTitle">Waiting for analysis</h2>
+              <p id="paperSubtitle">Upload a PDF or load the latest generated report to populate the workspace.</p>
+            </div>
+            <div class="workspace-stats" id="workspaceStats"></div>
+          </div>
+
+          <nav class="section-nav card">
+            <button data-target="analysis">Summary</button>
+            <button data-target="keywords">Keywords</button>
+            <button data-target="topics">Topics</button>
+            <button data-target="equations">Equations</button>
+            <button data-target="visuals">Visuals</button>
+            <button data-target="report">Report</button>
+          </nav>
+
+          <section class="content-grid" id="analysis">
+            <article class="content-card spotlight">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">Executive Summary</p>
+                  <h3>What this paper is saying</h3>
+                </div>
+              </div>
+              <p id="summaryText">The analysis summary will appear here once the pipeline completes.</p>
+            </article>
+            <article class="content-card">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">ELI5</p>
+                  <h3>Plain-language explanation</h3>
+                </div>
+              </div>
+              <p id="eli5Text">A simplified explanation will appear here.</p>
+            </article>
+            <article class="content-card">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">Key Contributions</p>
+                  <h3>Main research takeaways</h3>
+                </div>
+              </div>
+              <ol class="stack-list" id="contributionsList"></ol>
+            </article>
+            <article class="content-card">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">Critical Reading</p>
+                  <h3>Limitations and practical implications</h3>
+                </div>
+              </div>
+              <div class="dual-note">
+                <div>
+                  <strong>Applications</strong>
+                  <p id="applicationsText"></p>
+                </div>
+                <div>
+                  <strong>Limitations</strong>
+                  <p id="limitationsText"></p>
+                </div>
+              </div>
+            </article>
+          </section>
+
+          <section class="panel-row" id="keywords">
+            <article class="content-card">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">Extracted Keywords</p>
+                  <h3>Top concepts and terms</h3>
+                </div>
+              </div>
+              <div class="keyword-cloud" id="keywordCloud"></div>
+            </article>
+            <article class="content-card">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">Entity Snapshot</p>
+                  <h3>People, methods, and math concepts</h3>
+                </div>
+              </div>
+              <div class="entity-columns" id="entityColumns"></div>
+            </article>
+          </section>
+
+          <section class="panel-row" id="topics">
+            <article class="content-card">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">Discovered Topics</p>
+                  <h3>How the paper clusters semantically</h3>
+                </div>
+              </div>
+              <div class="topic-grid" id="topicGrid"></div>
+            </article>
+          </section>
+
+          <section class="panel-row" id="equations">
+            <article class="content-card">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">Equation Analysis</p>
+                  <h3>Mathematical structure and type breakdown</h3>
+                </div>
+              </div>
+              <div class="equation-layout">
+                <div class="equation-chart">
+                  <div class="donut" id="equationDonut"></div>
+                  <div class="donut-center">
+                    <strong id="equationTotal">0</strong>
+                    <span>equations</span>
+                  </div>
+                </div>
+                <div class="equation-details">
+                  <div class="equation-breakdown" id="equationBreakdown"></div>
+                  <div class="math-structure-box" id="mathStructureBox"></div>
+                </div>
+              </div>
+            </article>
+          </section>
+
+          <section class="panel-row" id="visuals">
+            <article class="content-card">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">Visual Insights</p>
+                  <h3>Generated charts from the analysis pipeline</h3>
+                </div>
+              </div>
+              <div class="visual-grid" id="visualGrid"></div>
+            </article>
+          </section>
+
+          <section class="panel-row" id="report">
+            <article class="content-card">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">Structured Report</p>
+                  <h3>Report-style output for fast review</h3>
+                </div>
+              </div>
+              <div class="report-grid">
+                <div class="report-section">
+                  <strong>Abstract</strong>
+                  <p id="abstractText"></p>
+                </div>
+                <div class="report-section">
+                  <strong>Section Coverage</strong>
+                  <div class="section-list" id="sectionList"></div>
+                </div>
+                <div class="report-section">
+                  <strong>Similarity Highlights</strong>
+                  <div class="insight-list" id="similarityList"></div>
+                </div>
+                <div class="report-section">
+                  <strong>Citation Snapshot</strong>
+                  <div class="insight-list" id="citationList"></div>
+                </div>
+              </div>
+            </article>
+          </section>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script src="/frontend/app.js"></script>
+</body>
+</html>

@@ -18,6 +18,9 @@ ENV/
 # Cache
 cache/
 .cache/
+data/uploads/
+.codex-publish-resa2/
+frontend-server*.log
 
 # HuggingFace model cache
 *.bin
