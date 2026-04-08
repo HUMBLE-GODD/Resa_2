@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np
 from typing import Dict, List, Optional
-from config import DEVICE, SENTENCE_TRANSFORMER_MODEL, CACHE_DIR
+from config import DEVICE, SENTENCE_TRANSFORMER_MODEL, CACHE_DIR, SEARCH_BATCH_SIZE, clear_device_cache
 
 
 class SemanticSearch:
@@ -76,7 +76,7 @@ class SemanticSearch:
         with torch.no_grad():
             embeddings = self._model.encode(
                 texts,
-                batch_size=32,
+                batch_size=SEARCH_BATCH_SIZE,
                 show_progress_bar=False,
                 convert_to_numpy=True,
                 normalize_embeddings=True,
@@ -159,9 +159,7 @@ class SemanticSearch:
             del self._model
             self._model = None
         self._index = None
-        import torch
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        clear_device_cache(DEVICE)
 
 
 if __name__ == "__main__":

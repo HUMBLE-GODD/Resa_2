@@ -15,14 +15,14 @@ import json
 import argparse
 import traceback
 
-# Fix Windows console encoding
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+# Fix Windows console encoding and keep stdout/stderr unbuffered for live progress streaming
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', write_through=True)
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', write_through=True)
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from config import DEVICE, RESULTS_DIR
+from config import DEVICE, DEVICE_NAME, RESULTS_DIR, clear_device_cache
 
 
 def print_banner():
@@ -31,7 +31,7 @@ def print_banner():
     print("  RESA_AI - Mathematical Research Paper NLP Pipeline v1.0.0")
     print("  Production-Grade Analysis System")
     print("=" * 70)
-    print(f"  Device: {DEVICE}")
+    print(f"  Device: {DEVICE_NAME} [{DEVICE}]")
     print(f"  Output: {RESULTS_DIR}")
     print("=" * 70 + "\n")
 
@@ -105,8 +105,6 @@ def phase3_features(data: dict) -> dict:
 
 def phase4_models(data: dict) -> dict:
     """Phase 4: Transformer Models. Each sub-step runs independently."""
-    import torch
-    
     # 4a: Long document chunking (lightweight, no model download)
     try:
         from models.longdoc_handler import LongDocHandler
@@ -141,18 +139,13 @@ def phase4_models(data: dict) -> dict:
         sim.unload()
     except Exception as e:
         print(f"  [WARN] Similarity failed: {e}")
-    
-    # Clean GPU memory
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-    
+
+    clear_device_cache(DEVICE)
     return data
 
 
 def phase5_analysis(data: dict) -> dict:
     """Phase 5: Advanced NLP Analysis."""
-    import torch
-    
     # 5a: Topic modeling
     from analysis.topic_modeling import TopicModeler
     modeler = TopicModeler()
@@ -173,10 +166,8 @@ def phase5_analysis(data: dict) -> dict:
     from analysis.equation_classifier import EquationClassifier
     eq_classifier = EquationClassifier()
     data = eq_classifier.classify(data)
-    
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-    
+
+    clear_device_cache(DEVICE)
     return data
 
 

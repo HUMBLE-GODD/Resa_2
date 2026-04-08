@@ -71,6 +71,22 @@
                 <span id="pipelineHint">The system will move through parsing, NLP, models, and report generation.</span>
               </div>
             </div>
+            <div class="settings-panel">
+              <div class="panel-head settings-head">
+                <div>
+                  <p class="eyebrow">LLM Settings</p>
+                  <h3>Groq API key</h3>
+                </div>
+                <span class="status-pill" id="groqStatus">Checking</span>
+              </div>
+              <p class="settings-copy" id="runtimeStatus">Detecting runtime compatibility...</p>
+              <div class="settings-row">
+                <input class="settings-input" id="groqKeyInput" type="password" autocomplete="off" placeholder="Paste Groq API key to enable Phase 6 insights">
+                <button class="ghost-button light-button" id="saveGroqButton" type="button">Save Key</button>
+                <button class="ghost-button light-button" id="clearGroqButton" type="button">Clear</button>
+              </div>
+              <p class="settings-note" id="groqNote">Stored locally in the backend on this machine for future runs.</p>
+            </div>
           </div>
         </div>
       </section>

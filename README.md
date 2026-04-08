@@ -1,636 +1,623 @@
-<p align="center">
-  <h1 align="center">🧠 RESA_AI</h1>
-  <p align="center">
-    <strong>Production-Grade NLP Pipeline for Mathematical Research Papers</strong>
-  </p>
-  <p align="center">
-    Ingest PDFs → Extract Structure → NLP Analysis → LLM Insights → Structured Reports
-  </p>
-</p>
+# RESA_AI
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white" />
-  <img src="https://img.shields.io/badge/PyTorch-2.0+-ee4c2c?logo=pytorch&logoColor=white" />
-  <img src="https://img.shields.io/badge/Transformers-4.30+-yellow?logo=huggingface&logoColor=white" />
-  <img src="https://img.shields.io/badge/Groq-LLaMA_3.3_70B-green?logo=meta&logoColor=white" />
-  <img src="https://img.shields.io/badge/GPU-Optimized-76b900?logo=nvidia&logoColor=white" />
-</p>
+RESA_AI is a local AI-powered analysis system for mathematical research papers. It takes a paper as input, parses its structure, runs multiple NLP and transformer stages, generates Groq-based insights, and produces both machine-readable and report-style outputs.
 
----
+This repository includes:
 
-## 📋 Table of Contents
+- A Python backend pipeline for PDF, LaTeX, and plain-text paper analysis
+- A lightweight frontend dashboard for PDF upload, live phase tracking, and report exploration
+- JSON, Markdown, and chart outputs saved to the `results/` directory
+- GPU-aware execution with an automatic low-VRAM path for smaller cards
 
-- [Overview](#overview)
-- [Key Features](#key-features)
-- [Tech Stack](#tech-stack)
-- [Architecture](#architecture)
-- [Project Structure](#project-structure)
-- [Pipeline Flow — Phase by Phase](#pipeline-flow--phase-by-phase)
-  - [Phase 1 — Data Ingestion](#phase-1--data-ingestion)
-  - [Phase 2 — Preprocessing](#phase-2--preprocessing)
-  - [Phase 3 — Feature Engineering](#phase-3--feature-engineering)
-  - [Phase 4 — Transformer Models](#phase-4--transformer-models)
-  - [Phase 5 — Advanced NLP Analysis](#phase-5--advanced-nlp-analysis)
-  - [Phase 6 — LLM Analysis (Groq)](#phase-6--llm-analysis-groq)
-  - [Phase 7 — Output Generation](#phase-7--output-generation)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Configuration](#configuration)
-- [Output Format](#output-format)
-- [GPU Optimization](#gpu-optimization)
-- [Models Used](#models-used)
+## What The Project Does
 
----
+Given a research paper, RESA_AI can:
 
-## Overview
+- Parse title, authors, abstract, sections, equations, and references
+- Clean and split mathematical content into natural-language and math-aware representations
+- Extract keywords, entities, and mathematical structures
+- Generate extractive and abstractive summaries
+- Classify sections and compute semantic similarity
+- Discover topics and build a semantic search index
+- Analyze citations and equation types
+- Generate high-level paper insights with Groq
+- Produce a structured JSON report, a Markdown report, and visualization assets
 
-**RESA_AI** is a modular, end-to-end Natural Language Processing pipeline specifically designed for analyzing **mathematical research papers**. It handles the unique challenges of academic math text — LaTeX expressions, symbolic notation, dense technical language, and formal proof structures.
+The frontend is designed around the same flow:
 
-Given a PDF research paper, RESA_AI automatically:
+1. Upload a PDF
+2. Watch the paper move through each pipeline phase
+3. Explore the final analysis through summary, ELI5, keywords, topics, equations, visuals, and report panels
 
-1. **Parses** the document into structured sections, equations, and references
-2. **Cleans and tokenizes** text while preserving mathematical expressions
-3. **Extracts** keywords, named entities, and mathematical structures (theorems, proofs, lemmas)
-4. **Classifies** sections and generates abstractive summaries using transformers
-5. **Discovers topics**, builds a semantic search index, and analyzes citations
-6. **Generates LLM-powered insights** via Groq API (summary, ELI5, contributions, applications, limitations)
-7. **Outputs** a structured JSON report, markdown document, and publication-quality visualizations
+## Core Highlights
 
----
+- Research-paper focused pipeline, especially for dense mathematical documents
+- Web dashboard with live job polling and phase-by-phase progress
+- CLI entrypoint for direct batch or local execution
+- Groq integration for summary, ELI5, contributions, applications, and limitations
+- Multiple output formats: JSON, Markdown, and PNG charts
+- Automatic GPU detection through PyTorch
+- Low-VRAM mode for GPUs under 6 GB
+- Single-job protection in the web app to avoid overlapping heavy analyses
 
-## Key Features
+## Architecture Overview
 
-| Feature | Description |
-|---------|-------------|
-| 🔬 **Math-Aware Processing** | Preserves LaTeX/math expressions with `[MATH]...[/MATH]` tagging throughout the entire pipeline |
-| ⚡ **GPU-Optimized** | Auto-detects CUDA, uses FP16 mixed precision, TF32 on Ampere+, and dynamic batch sizing |
-| 🧩 **Modular Architecture** | 8 independent phases — each can run, test, and fail independently |
-| 🤖 **Multi-Model** | BART-large-CNN (summarization), BART-large-MNLI (zero-shot), all-MiniLM-L6-v2 (embeddings), BERTopic (topics) |
-| 🌐 **Groq LLM Integration** | LLaMA 3.3 70B with Mixtral 8x7B fallback for deep reasoning |
-| 📊 **Rich Visualizations** | Dark-themed matplotlib charts: keywords, equation distribution, topic clusters |
-| 🛡️ **Fault-Tolerant** | Keyword-based classification fallback, graceful degradation on CPU, try/except isolation per sub-step |
-| 💾 **Embedding Caching** | Sentence embeddings cached to disk for repeat analyses |
-
----
+```text
+PDF upload or CLI input
+        |
+        v
+main.py orchestrator
+        |
+        +--> Phase 1: ingestion
+        +--> Phase 2: preprocessing
+        +--> Phase 3: feature engineering
+        +--> Phase 4: transformer models
+        +--> Phase 5: advanced NLP analysis
+        +--> Phase 6: Groq LLM analysis
+        +--> Phase 7: output generation
+        |
+        v
+results/report.json
+results/final_report.md
+results/*.png
+        |
+        v
+frontend_server.py exposes latest report and live job status
+        |
+        v
+frontend/ dashboard renders the workspace
+```
 
 ## Tech Stack
 
-### Core Framework
+### Frontend
 
-| Layer | Technology | Purpose |
-|-------|-----------|---------|
-| **Language** | Python 3.11+ | Core runtime |
-| **Deep Learning** | PyTorch 2.0+ | GPU acceleration, tensor operations |
-| **Transformers** | HuggingFace Transformers 4.30+ | BART summarization, zero-shot classification |
-| **Embeddings** | Sentence-Transformers 2.2+ | Dense semantic embeddings (all-MiniLM-L6-v2) |
-| **NLP** | spaCy 3.5+ (`en_core_web_sm`) | Named entity recognition, POS tagging |
-| **Topic Modeling** | BERTopic 0.15+ | Neural topic discovery with UMAP + HDBSCAN |
+| Layer | Technology | Role |
+|---|---|---|
+| UI | HTML5 | Static document structure |
+| Styling | CSS3 | SaaS-style dashboard layout and components |
+| Interactivity | Vanilla JavaScript | Upload flow, polling, rendering report sections |
+| Rendering model | No framework | No build step, no React/Vue dependency |
 
-### PDF & Text Processing
+### Application Layer
 
-| Library | Purpose |
-|---------|---------|
-| **PyMuPDF (fitz)** | PDF parsing — text blocks, font sizes, page layout |
-| **pdfplumber** | Alternative PDF extraction |
-| **re / unicodedata** | Regex-based math extraction, Unicode normalization |
+| Layer | Technology | Role |
+|---|---|---|
+| Runtime | Python 3.11+ | Main execution environment |
+| Web server | `http.server.ThreadingHTTPServer` | Local frontend hosting and API endpoints |
+| Upload parsing | `cgi.FieldStorage` | Multipart PDF upload handling |
+| Background jobs | `threading` + `subprocess` | Launch and monitor analysis jobs |
+| Data format | JSON | Job state and final structured report |
 
-### Keyword Extraction (Triple Method)
+### NLP, ML, and LLM Stack
 
-| Method | Library | Strategy |
-|--------|---------|----------|
-| **TF-IDF** | scikit-learn | Statistical term importance |
-| **YAKE** | yake | Unsupervised keyword extraction |
-| **KeyBERT** | keybert | Transformer-based semantic keywords |
+| Area | Technology | Role |
+|---|---|---|
+| PDF parsing | PyMuPDF (`fitz`) | Structured PDF extraction |
+| Alt PDF support | `pdfplumber` | Additional PDF processing dependency |
+| Text cleaning | `re`, `unicodedata2` | Normalization and math-safe cleanup |
+| Named entities | spaCy `en_core_web_sm` | People, orgs, and academic entities |
+| Statistical NLP | scikit-learn | TF-IDF scoring and keyword extraction support |
+| Keyword extraction | YAKE, KeyBERT | Multi-method keyword discovery |
+| Deep learning | PyTorch | CPU/GPU execution |
+| Seq2seq summarization | Hugging Face Transformers | `facebook/bart-large-cnn` |
+| Zero-shot classification | Hugging Face Transformers | `facebook/bart-large-mnli` |
+| Embeddings | Sentence Transformers | `all-MiniLM-L6-v2` |
+| Topic modeling | BERTopic | Semantic topic discovery |
+| LLM reasoning | Groq Python SDK | Summary, ELI5, contributions, applications, limitations |
 
-### LLM Integration
+### Visualization and Outputs
 
-| Provider | Model | Role |
-|----------|-------|------|
-| **Groq API** | `llama-3.3-70b-versatile` | Primary reasoning (summary, ELI5, contributions) |
-| **Groq API** | `mixtral-8x7b-32768` | Fallback model |
+| Output | Technology | Role |
+|---|---|---|
+| Structured report | JSON | Machine-readable full analysis |
+| Human report | Markdown | Reviewer-friendly report output |
+| Charts | Matplotlib | Keyword, equation, citation, classification, topic, and math-density visuals |
+| Numeric processing | NumPy | Embeddings, similarity matrices, chart data |
 
-### Visualization & Output
+### Hardware and Runtime Characteristics
 
-| Library | Purpose |
-|---------|---------|
-| **Matplotlib 3.7+** | Dark-themed publication-quality charts |
-| **Seaborn 0.12+** | Statistical visualization |
-| **JSON** | Structured machine-readable report |
-| **Markdown** | Human-readable final report |
-
----
-
-## Architecture
-
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│                        RESA_AI PIPELINE                             │
-│                        main.py (Orchestrator)                        │
-└───────────────────────────────┬──────────────────────────────────────┘
-                                │
-          ┌─────────────────────┼─────────────────────┐
-          │                     │                     │
-          ▼                     ▼                     ▼
-   ┌─────────────┐    ┌─────────────┐    ┌──────────────────┐
-   │   config.py  │    │  paperDCRE  │    │  results/        │
-   │  GPU/Models  │    │  -1.pdf     │    │  report.json     │
-   │  API Keys    │    │  (Input)    │    │  final_report.md │
-   │  Parameters  │    │             │    │  *.png charts    │
-   └─────────────┘    └──────┬──────┘    └──────────────────┘
-                              │
-          ┌───────────────────┼───────────────────────────────┐
-          │                   │                               │
-          ▼                   ▼                               ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                     PHASE 1: DATA INGESTION                      │
-│  ingestion/                                                      │
-│  ├── pdf_parser.py    → PyMuPDF font-size heuristics             │
-│  ├── latex_parser.py  → LaTeX \begin{} \end{} parsing            │
-│  └── text_parser.py   → Regex-based section detection            │
-│                                                                   │
-│  Output: { title, authors, abstract, sections[], equations[],     │
-│            references[], raw_text, pages }                        │
-└────────────────────────────────┬─────────────────────────────────┘
-                                 │
-                                 ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                     PHASE 2: PREPROCESSING                       │
-│  preprocessing/                                                   │
-│  ├── cleaner.py    → Noise removal, Unicode normalization         │
-│  ├── tokenizer.py  → SciBERT tokenization with [MATH] tokens     │
-│  └── dual_repr.py  → Separate NL text and math expressions       │
-│                                                                   │
-│  Output: { cleaned_text, nl_text, math_expressions[],             │
-│            nl_sections[], inline_math[], display_math[] }         │
-└────────────────────────────────┬─────────────────────────────────┘
-                                 │
-                                 ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                  PHASE 3: FEATURE ENGINEERING                    │
-│  features/                                                        │
-│  ├── keyword_extractor.py  → TF-IDF + YAKE + KeyBERT fusion      │
-│  ├── entity_extractor.py   → spaCy NER + custom math rules       │
-│  └── math_structure.py     → Theorem/Proof/Lemma detection        │
-│                                                                   │
-│  Output: { keywords{tfidf, yake, keybert, combined},              │
-│            entities{persons, methods, concepts, math_entities},   │
-│            math_structures{definitions, theorems, proofs,         │
-│                            relationships[]} }                     │
-└────────────────────────────────┬─────────────────────────────────┘
-                                 │
-                                 ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                  PHASE 4: TRANSFORMER MODELS                     │
-│  models/                                                          │
-│  ├── longdoc_handler.py     → Sliding window chunking (512 tok)   │
-│  ├── summarizer.py          → Extractive (TF-IDF) + Abstractive  │
-│  │                            (BART-large-CNN)                    │
-│  ├── scibert_classifier.py  → Zero-shot (BART-MNLI) + keyword    │
-│  │                            fallback                            │
-│  └── similarity.py          → Sentence-transformer cosine sim    │
-│                                                                   │
-│  Output: { chunks[], summary{extractive, abstractive, combined},  │
-│            classifications[], similarity_matrix }                 │
-└────────────────────────────────┬─────────────────────────────────┘
-                                 │
-                                 ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                PHASE 5: ADVANCED NLP ANALYSIS                    │
-│  analysis/                                                        │
-│  ├── topic_modeling.py     → BERTopic (UMAP + HDBSCAN + TF-IDF)  │
-│  ├── semantic_search.py    → Dense retrieval with MiniLM          │
-│  ├── citation_analysis.py  → Frequency, context, purpose          │
-│  └── equation_classifier.py→ Rule-based equation type (9 domains) │
-│                                                                   │
-│  Output: { topics[], search_index, citation_analysis{},           │
-│            equation_classifications[] }                           │
-└────────────────────────────────┬─────────────────────────────────┘
-                                 │
-                                 ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                  PHASE 6: GROQ LLM ANALYSIS                      │
-│  llm/                                                             │
-│  ├── groq_client.py    → API client with LLaMA/Mixtral fallback   │
-│  └── prompt_builder.py → Structured prompt templates              │
-│                                                                   │
-│  Output: { llm_insights{summary, eli5, contributions,             │
-│                          applications, limitations} }             │
-└────────────────────────────────┬─────────────────────────────────┘
-                                 │
-                                 ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                  PHASE 7: OUTPUT GENERATION                      │
-│  output/                                                          │
-│  ├── json_report.py     → Structured JSON with all results        │
-│  ├── visualizations.py  → Dark-themed matplotlib charts           │
-│  └── final_report.py    → Comprehensive markdown report           │
-│                                                                   │
-│  Output Files:                                                    │
-│  ├── results/report.json           (38 KB structured data)        │
-│  ├── results/final_report.md       (21 KB human-readable)         │
-│  ├── results/keyword_chart.png     (keyword bar chart)            │
-│  ├── results/equation_distribution.png (equation pie chart)       │
-│  └── results/topic_chart.png       (topic distribution bars)      │
-└──────────────────────────────────────────────────────────────────┘
-```
-
----
+| Area | Behavior |
+|---|---|
+| CPU mode | Fully supported |
+| GPU mode | Enabled automatically when CUDA is available to PyTorch |
+| Low-VRAM mode | Enabled automatically when total GPU memory is under 6 GB |
+| Model downloads | Hugging Face models download on first run |
+| Groq dependency | Optional, but required for Phase 6 LLM insights |
 
 ## Project Structure
 
-```
+```text
 RESA_AI/
-│
-├── main.py                     # Pipeline orchestrator — runs all 7 phases
-├── config.py                   # Global config: GPU, models, API keys, parameters
-├── requirements.txt            # Python dependencies
-├── README.md                   # This file
-│
-├── ingestion/                  # PHASE 1: Document Parsing
-│   ├── __init__.py
-│   ├── pdf_parser.py           # PyMuPDF-based PDF → structured extraction
-│   ├── latex_parser.py         # LaTeX source → structured extraction
-│   └── text_parser.py          # Plain text → heuristic section detection
-│
-├── preprocessing/              # PHASE 2: Text Cleaning & Tokenization
-│   ├── __init__.py
-│   ├── cleaner.py              # Noise removal, Unicode normalization
-│   ├── tokenizer.py            # SciBERT tokenizer with [MATH] special tokens
-│   └── dual_repr.py            # Separate NL text and math expressions
-│
-├── features/                   # PHASE 3: Feature Engineering
-│   ├── __init__.py
-│   ├── keyword_extractor.py    # TF-IDF + YAKE + KeyBERT keyword extraction
-│   ├── entity_extractor.py     # spaCy NER + custom math entity rules
-│   └── math_structure.py       # Theorem / Proof / Lemma / Definition detection
-│
-├── models/                     # PHASE 4: Transformer Models
-│   ├── __init__.py
-│   ├── longdoc_handler.py      # Sliding window chunking for long documents
-│   ├── summarizer.py           # Extractive (TF-IDF) + Abstractive (BART-large-CNN)
-│   ├── scibert_classifier.py   # Zero-shot classification + keyword fallback
-│   └── similarity.py           # Semantic similarity (sentence-transformers)
-│
-├── analysis/                   # PHASE 5: Advanced NLP Analysis
-│   ├── __init__.py
-│   ├── topic_modeling.py       # BERTopic topic discovery
-│   ├── semantic_search.py      # Dense retrieval search over paper sections
-│   ├── citation_analysis.py    # Citation frequency, context, purpose classification
-│   └── equation_classifier.py  # Rule-based equation type classification (9 domains)
-│
-├── llm/                        # PHASE 6: Groq LLM Integration
-│   ├── __init__.py
-│   ├── groq_client.py          # Groq API client with LLaMA / Mixtral fallback
-│   └── prompt_builder.py       # Structured prompt templates for 5 analysis types
-│
-├── output/                     # PHASE 7: Report Generation
-│   ├── __init__.py
-│   ├── json_report.py          # Compile all results → structured JSON
-│   ├── visualizations.py       # Dark-themed matplotlib charts (3 types)
-│   └── final_report.py         # Comprehensive markdown report generator
-│
-├── results/                    # Generated output directory
-│   ├── report.json             # Machine-readable structured report
-│   ├── final_report.md         # Human-readable markdown report
-│   ├── keyword_chart.png       # Top keywords bar chart
-│   ├── equation_distribution.png # Equation type pie chart
-│   └── topic_chart.png         # Topic distribution bar chart
-│
-├── cache/                      # Cached embeddings for repeat runs
-└── data/                       # Intermediate data storage
+|-- main.py
+|-- config.py
+|-- frontend_server.py
+|-- requirements.txt
+|-- README.md
+|-- LICENSE
+|
+|-- ingestion/
+|   |-- pdf_parser.py
+|   |-- latex_parser.py
+|   `-- text_parser.py
+|
+|-- preprocessing/
+|   |-- cleaner.py
+|   |-- dual_repr.py
+|   `-- tokenizer.py
+|
+|-- features/
+|   |-- keyword_extractor.py
+|   |-- entity_extractor.py
+|   `-- math_structure.py
+|
+|-- models/
+|   |-- longdoc_handler.py
+|   |-- summarizer.py
+|   |-- scibert_classifier.py
+|   `-- similarity.py
+|
+|-- analysis/
+|   |-- topic_modeling.py
+|   |-- semantic_search.py
+|   |-- citation_analysis.py
+|   `-- equation_classifier.py
+|
+|-- llm/
+|   |-- groq_client.py
+|   `-- prompt_builder.py
+|
+|-- output/
+|   |-- json_report.py
+|   |-- final_report.py
+|   `-- visualizations.py
+|
+|-- frontend/
+|   |-- index.html
+|   |-- styles.css
+|   `-- app.js
+|
+|-- results/
+|   |-- report.json
+|   |-- final_report.md
+|   `-- *.png
+|
+|-- cache/
+|   |-- search_index.npy
+|   `-- section_embeddings.npy
+|
+`-- data/
+    `-- uploads/
 ```
 
----
+## Step-By-Step Process
 
-## Pipeline Flow — Phase by Phase
+### User Flow
 
-### Phase 1 — Data Ingestion
+1. The user opens the local dashboard served by `frontend_server.py`.
+2. The user uploads a PDF through the web UI.
+3. The server saves the file to `data/uploads/` and creates a job record.
+4. The server starts `main.py` in a background subprocess.
+5. The frontend polls `/api/jobs/<job_id>` and updates the progress timeline.
+6. Each pipeline phase updates the current job message and phase status.
+7. When the run completes, the server loads `results/report.json`.
+8. The frontend renders the report workspace from the generated report and chart assets.
 
-**Module:** `ingestion/pdf_parser.py`
+### Internal Pipeline, Phase By Phase
 
-The PDF parser uses **PyMuPDF** to extract text blocks with font metadata. It employs heuristic rules based on font size to identify:
+#### Phase 1: Data ingestion
 
-- **Title** — Largest font block on page 1
-- **Authors** — Second-largest font between title and abstract
-- **Abstract** — Text following "abstract" keyword
-- **Sections** — Font sizes that match heading patterns (bold, larger than body text)
-- **Equations** — Lines containing mathematical symbols (`∑`, `∫`, `∏`, `=`, `≤`, etc.) or LaTeX patterns
-- **References** — Entries after "References" or "Bibliography" heading
+Primary modules:
 
-```python
-# Example: Automatic structure detection
-parser = PDFParser()
-data = parser.parse("paper.pdf")
-# → data["title"] = "The Counting Function of Semiprimes"
-# → data["sections"] = [{"title": "Introduction", "content": "..."}, ...]
-# → data["equations"] = ["π₂(x) ∼ x/log(x)", ...]  (287 equations found)
-```
+- `ingestion/pdf_parser.py`
+- `ingestion/latex_parser.py`
+- `ingestion/text_parser.py`
 
-### Phase 2 — Preprocessing
+What happens:
 
-**Modules:** `preprocessing/cleaner.py`, `dual_repr.py`
+- Input type is auto-detected from the file extension, unless overridden with `--type`
+- PDFs are parsed with PyMuPDF
+- The parser extracts title, authors, abstract, sections, equations, references, raw text, and document metadata
+- Section detection uses regex heuristics and heading-like patterns
+- Equation detection uses math-symbol and LaTeX-style pattern matching
 
-1. **Cleaning** — Removes page numbers, headers/footers, DOIs, citation markers `[1]`, redundant whitespace. Preserves `[MATH]...[/MATH]` tagged expressions.
-2. **Dual Representation** — Splits each section into:
-   - **NL text** (natural language) — for transformer models
-   - **Math expressions** (inline `$...$` and display `$$...$$`) — preserved separately
+Main output keys:
 
-```python
-# Before cleaning: "Page 3 of 13 · doi:10.1234 · We prove that [1]..."
-# After cleaning:  "We prove that..."
-# Reduction: ~6% noise removed on average
-```
+- `title`
+- `authors`
+- `abstract`
+- `sections`
+- `equations`
+- `references`
+- `raw_text`
+- `metadata`
 
-### Phase 3 — Feature Engineering
+#### Phase 2: Preprocessing
 
-**Modules:** `features/keyword_extractor.py`, `entity_extractor.py`, `math_structure.py`
+Primary modules:
 
-Three parallel extraction pipelines:
+- `preprocessing/cleaner.py`
+- `preprocessing/dual_repr.py`
 
-| Extractor | Method | Output Example |
-|-----------|--------|---------------|
-| **Keywords** | TF-IDF + YAKE + KeyBERT fusion | "semiprime counting function", "prime number theorem" |
-| **Entities** | spaCy `en_core_web_sm` + custom rules | Persons: "Landau", Methods: "combinatorial argument" |
-| **Math Structures** | Regex pattern matching | Theorem 2.1, Lemma 3, Proof by induction |
+What happens:
 
-The keyword extractor fuses results from three methods using weighted scoring:
-- TF-IDF (statistical) → 40 candidates
-- YAKE (unsupervised) → 40 candidates
-- KeyBERT (semantic, transformer-based) → 40 candidates
-- **Combined** → top 20 by fusion score
+- Raw text is cleaned and normalized
+- Mathematical expressions wrapped as `[MATH]...[/MATH]` are preserved
+- The document is split into two parallel views:
+  - natural-language text for NLP models
+  - extracted math expressions for math-specific analysis
+- Per-section math density is calculated
 
-### Phase 4 — Transformer Models
+Main output keys:
 
-**Modules:** `models/summarizer.py`, `scibert_classifier.py`, `similarity.py`, `longdoc_handler.py`
+- `cleaned_text`
+- `nl_text`
+- `nl_sections`
+- `all_math_expressions`
+- `math_stats`
 
-#### Long Document Handling
-Papers exceeding 512 tokens are split using a **sliding window** strategy:
-- Window size: 512 tokens
-- Overlap: 64 tokens
-- Each chunk processed independently, results merged
+#### Phase 3: Feature engineering
 
-#### Summarization (Two-Stage)
-1. **Extractive** — TF-IDF scoring + position bias + keyword bonus → top 5 sentences
-2. **Abstractive** — BART-large-CNN transformer generates fluent summary
-   - **GPU mode:** 4-beam search, max 250 tokens (high quality)
-   - **CPU mode:** Greedy decoding, max 150 tokens (4× faster)
+Primary modules:
 
-#### Section Classification
-- **Primary:** Zero-shot classification via BART-large-MNLI with 10 candidate labels
-- **Fallback:** Keyword-based rule matching (when model unavailable or network slow)
-- Labels: `introduction`, `methodology`, `results`, `discussion`, `conclusion`, `related_work`, `theory`, `experiments`, `abstract`, `references`
+- `features/keyword_extractor.py`
+- `features/entity_extractor.py`
+- `features/math_structure.py`
 
-#### Semantic Similarity
-- Encodes all sections using `all-MiniLM-L6-v2`
-- Computes pairwise cosine similarity matrix
-- Identifies most/least similar section pairs
+What happens:
 
-### Phase 5 — Advanced NLP Analysis
+- Keywords are extracted using TF-IDF, YAKE, and KeyBERT
+- Keyword candidates are fused into a ranked list
+- spaCy extracts named entities
+- Regex rules detect methods, theorems, lemmas, propositions, definitions, and math concepts
+- Mathematical structure signals are summarized
 
-**Modules:** `analysis/topic_modeling.py`, `semantic_search.py`, `citation_analysis.py`, `equation_classifier.py`
+Main output keys:
 
-| Analysis | Method | Output |
-|----------|--------|--------|
-| **Topic Modeling** | BERTopic (sentence-transformers + UMAP + HDBSCAN) | 12 topics with keywords, e.g., Topic 0: "log, the, of, for" |
-| **Semantic Search** | Dense retrieval with MiniLM embeddings | 327 searchable units, query → top-k relevant passages |
-| **Citation Analysis** | Regex extraction + context windowing | Citation frequency, purpose classification, density metrics |
-| **Equation Classification** | Rule-based pattern matching across 9 math domains | 287 equations → {other: 280, number_theory: 5, ...} |
+- `keywords`
+- `entities`
+- `math_structures`
 
-**Equation domains:** algebra, calculus, optimization, probability, linear_algebra, differential_equations, number_theory, statistics, geometry, other
+#### Phase 4: Transformer models
 
-### Phase 6 — LLM Analysis (Groq)
+Primary modules:
 
-**Modules:** `llm/groq_client.py`, `prompt_builder.py`
+- `models/longdoc_handler.py`
+- `models/summarizer.py`
+- `models/scibert_classifier.py`
+- `models/similarity.py`
 
-Sends structured prompts to **Groq's LLaMA 3.3 70B** API for five analysis types:
+What happens:
 
-| Analysis Type | Prompt Focus | Output |
-|--------------|-------------|--------|
-| **Summary** | Comprehensive paper overview | Multi-paragraph technical summary |
-| **ELI5** | "Explain like I'm 5" | Accessible explanation with analogies |
-| **Contributions** | Novel contributions | Numbered list of key contributions |
-| **Applications** | Practical & future applications | Real-world use cases |
-| **Limitations** | Weaknesses & gaps | Critical analysis of methodology |
+- Long sections are chunked for safer downstream model processing
+- A two-part summary is generated:
+  - extractive summary via TF-IDF and sentence scoring
+  - abstractive summary via `facebook/bart-large-cnn`
+- Section classification is attempted with `facebook/bart-large-mnli`
+- A keyword fallback classifier is used when the model is unavailable or low-VRAM mode is active
+- Sentence-transformer embeddings are created and used to compute inter-section similarity
 
-**Fault Tolerance:**
-- Primary: `llama-3.3-70b-versatile`
-- Fallback: `mixtral-8x7b-32768` (if primary rate-limited)
-- Temperature: 0.3 (focused, deterministic)
+Important note:
 
-### Phase 7 — Output Generation
+- Despite the file name `scibert_classifier.py`, the active zero-shot classifier in the current pipeline is `facebook/bart-large-mnli`
 
-**Modules:** `output/json_report.py`, `visualizations.py`, `final_report.py`
+Main output keys:
 
-#### JSON Report (`report.json`)
-Complete machine-readable output (~38 KB) containing all pipeline results: metadata, keywords, entities, classifications, topics, LLM insights, and statistics.
+- `chunks`
+- `summary`
+- `classifications`
+- `similarity`
 
-#### Markdown Report (`final_report.md`)
-Human-readable document (~21 KB) with:
-- Paper metadata and abstract
-- Key terms and mathematical analysis
-- Topic discovery results
-- Full LLM-generated analysis (summary, ELI5, contributions, applications, limitations)
-- Visualization references
+#### Phase 5: Advanced NLP analysis
 
-#### Visualizations (Dark-Themed)
-Three publication-quality charts:
+Primary modules:
 
-1. **Keyword Chart** — Horizontal bar chart of top keywords by relevance score
-2. **Equation Distribution** — Pie chart of equation types across 9 math domains
-3. **Topic Distribution** — Horizontal bar chart of discovered topics by document count
+- `analysis/topic_modeling.py`
+- `analysis/semantic_search.py`
+- `analysis/citation_analysis.py`
+- `analysis/equation_classifier.py`
 
----
+What happens:
 
-## Installation
+- BERTopic groups the paper into semantic topics
+- A sentence-level semantic search index is built and cached
+- Citation frequency and citation density are analyzed
+- Equations are classified into high-level math domains
+- Fallback logic is used when BERTopic is unavailable or the paper is too small
 
-### Prerequisites
-- Python 3.11+
-- pip
-- (Optional) NVIDIA GPU with CUDA for acceleration
+Main output keys:
 
-### Setup
+- `topics`
+- `search_index`
+- `citation_analysis`
+- `equation_analysis`
 
-```bash
-# Clone or navigate to project
-cd RESA_AI
+#### Phase 6: Groq LLM analysis
 
-# Install dependencies
-pip install -r requirements.txt
+Primary modules:
 
-# Download spaCy model
-python -m spacy download en_core_web_sm
-```
+- `llm/groq_client.py`
+- `llm/prompt_builder.py`
 
-### First-Run Note
-On the first run, HuggingFace models will be downloaded and cached (~3 GB total):
-- `facebook/bart-large-cnn` (~1.6 GB) — Summarization
-- `facebook/bart-large-mnli` (~1.6 GB) — Zero-shot classification
-- `sentence-transformers/all-MiniLM-L6-v2` (~80 MB) — Embeddings
+What happens:
 
-Subsequent runs load from `~/.cache/huggingface/` and are much faster.
+- The pipeline builds a context packet from title, abstract, sections, keywords, math structure, equation type, and key sentences
+- Groq generates:
+  - summary
+  - ELI5 explanation
+  - contributions
+  - applications
+  - limitations
+- Primary model: `llama-3.3-70b-versatile`
+- Fallback model: `mixtral-8x7b-32768`
+- If no `GROQ_API_KEY` is available, this stage is skipped gracefully
 
----
+Main output keys:
 
-## Usage
+- `llm_analysis`
 
-### Basic Usage
+#### Phase 7: Output generation
 
-```bash
-python main.py <path-to-pdf>
-```
+Primary modules:
 
-### Example
+- `output/json_report.py`
+- `output/final_report.py`
+- `output/visualizations.py`
 
-```bash
-python main.py paperDCRE-1.pdf
-```
+What happens:
 
-### Output
+- The full analysis is written to `results/report.json`
+- A readable report is written to `results/final_report.md`
+- Visualization assets are created as PNG files
+- Embedding caches remain under `cache/`
 
-```
-======================================================================
-  RESA_AI - Mathematical Research Paper NLP Pipeline v1.0.0
-======================================================================
+Main output keys:
 
-  PHASE 1: DATA INGESTION ......................... 0.3s  ✅
-  PHASE 2: PREPROCESSING .......................... 0.0s  ✅
-  PHASE 3: FEATURE ENGINEERING .................... 27.2s ✅
-  PHASE 4: TRANSFORMER MODELS .................... varies ✅
-  PHASE 5: ADVANCED NLP ANALYSIS .................. 42.1s ✅
-  PHASE 6: GROQ LLM ANALYSIS ..................... 13.5s ✅
-  PHASE 7: OUTPUT GENERATION ......................  1.0s ✅
+- `json_report`
+- `json_report_path`
+- `final_report_path`
+- `visualizations`
 
-  Total Time: ~87s (CPU) | ~45s (GPU)
+## Frontend Workflow
 
-  [JSON]   results/report.json
-  [REPORT] results/final_report.md
-  [CHARTS] results/keyword_chart.png
-           results/equation_distribution.png
-           results/topic_chart.png
-```
+The frontend is intentionally lightweight and framework-free.
 
----
+Frontend files:
 
-## Configuration
+- `frontend/index.html`
+- `frontend/styles.css`
+- `frontend/app.js`
 
-All tunable parameters are centralized in `config.py`:
+Server file:
 
-### Key Configuration Options
+- `frontend_server.py`
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `SUMMARIZER_MODEL` | `facebook/bart-large-cnn` | Abstractive summarizer model |
-| `ZERO_SHOT_MODEL` | `facebook/bart-large-mnli` | Zero-shot classifier model |
-| `SENTENCE_TRANSFORMER_MODEL` | `all-MiniLM-L6-v2` | Embedding model |
-| `GROQ_MODEL` | `llama-3.3-70b-versatile` | Primary LLM |
-| `CHUNK_SIZE` | 512 | Tokens per sliding window chunk |
-| `CHUNK_OVERLAP` | 64 | Overlap between chunks |
-| `TOP_K_KEYWORDS` | 20 | Number of extracted keywords |
-| `TOP_K_SUMMARY_SENTENCES` | 5 | Extractive summary length |
-| `CUDA_MEMORY_FRACTION` | 0.85 | Max GPU memory allocation |
-| `GROQ_TEMPERATURE` | 0.3 | LLM generation temperature |
+Current dashboard behavior:
 
-### Environment Variables
+- Uploads PDF files through `/api/analyze`
+- Polls `/api/jobs/<job_id>` for live status
+- Loads the most recent saved report from `/api/report/latest`
+- Displays progress through seven high-level phases
+- Surfaces summary, ELI5, contributions, keywords, topics, equation breakdown, visuals, and report sections
+- Blocks parallel uploads while one heavy analysis job is already running
 
-| Variable | Description |
-|----------|-------------|
-| `GROQ_API_KEY` | Groq API key (fallback hardcoded in config) |
-| `HF_TOKEN` | HuggingFace token for faster downloads |
+## Generated Outputs
 
----
+### Primary files
 
-## Output Format
+| File | Purpose |
+|---|---|
+| `results/report.json` | Main structured analysis output |
+| `results/final_report.md` | Human-readable report |
+| `results/keyword_chart.png` | Keyword relevance chart |
+| `results/equation_distribution.png` | Equation-type distribution |
+| `results/topic_chart.png` | Topic distribution chart |
 
-### JSON Report Structure
+### Additional charts that may also be generated
+
+- `results/classification_chart.png`
+- `results/citation_chart.png`
+- `results/math_density.png`
+
+### Report schema summary
+
+The JSON report contains these top-level sections:
 
 ```json
 {
-  "metadata": {
-    "title": "The Counting Function of Semiprimes",
-    "authors": ["Dragos", "Cris", "Radek Erban"],
-    "pages": 13,
-    "analysis_date": "2026-03-28",
-    "pipeline_version": "1.0.0"
-  },
-  "structure": {
-    "sections": 35,
-    "equations": 287,
-    "references": 23,
-    "characters": 30167
-  },
-  "keywords": {
-    "tfidf": [...],
-    "yake": [...],
-    "keybert": [...],
-    "combined_top": ["log", "semiprime counting function", ...]
-  },
-  "entities": {
-    "persons": [...],
-    "methods": [...],
-    "concepts": [...]
-  },
-  "topics": [
-    {"id": 0, "keywords": ["log", "the", "of"], "count": 149},
-    ...
-  ],
-  "equation_analysis": {
-    "total": 287,
-    "distribution": {"other": 280, "number_theory": 5, ...}
-  },
-  "llm_insights": {
-    "summary": "...",
-    "eli5": "...",
-    "contributions": "...",
-    "applications": "...",
-    "limitations": "..."
-  }
+  "metadata": {},
+  "abstract": "",
+  "structure": {},
+  "mathematics": {},
+  "insights": {},
+  "topics": {},
+  "classifications": [],
+  "summary": {},
+  "citations": {},
+  "similarity": {},
+  "llm_analysis": {}
 }
 ```
 
----
+## Installation
 
-## GPU Optimization
+### Requirements
 
-RESA_AI auto-detects hardware and optimizes accordingly:
+- Python 3.11 or newer
+- `pip`
+- Optional NVIDIA GPU with a CUDA-enabled PyTorch build
+- Groq API key if you want Phase 6 LLM outputs
 
-| Feature | GPU Mode | CPU Mode |
-|---------|----------|----------|
-| **Precision** | FP16 mixed precision | FP32 |
-| **Batch Size** | 16 | 4 |
-| **Summarizer Beams** | 4 (beam search) | 1 (greedy) |
-| **Summary Max Length** | 250 tokens | 150 tokens |
-| **TF32 Acceleration** | Enabled (Ampere+) | N/A |
-| **Memory Management** | 85% cap + `empty_cache()` | Standard |
-| **cuDNN Benchmark** | Enabled | N/A |
-| **Estimated Runtime** | ~45s | ~90s+ |
+### Setup
 
-### Memory Safety
-- Models are loaded/unloaded sequentially to prevent OOM
-- `torch.cuda.empty_cache()` called between phases
-- GPU memory capped at 85% to keep system responsive
+```powershell
+cd C:\path\to\RESA_AI
+python -m pip install -r requirements.txt
+python -m spacy download en_core_web_sm
+```
 
----
+### Groq API key
 
-## Models Used
+PowerShell, current session only:
 
-| Model | Size | Task | Provider |
-|-------|------|------|----------|
-| `facebook/bart-large-cnn` | 406M params | Abstractive Summarization | HuggingFace |
-| `facebook/bart-large-mnli` | 406M params | Zero-Shot Classification | HuggingFace |
-| `all-MiniLM-L6-v2` | 22M params | Sentence Embeddings | Sentence-Transformers |
-| `en_core_web_sm` | 12M params | NER / POS Tagging | spaCy |
-| `llama-3.3-70b-versatile` | 70B params | Deep Reasoning (API) | Groq |
-| `mixtral-8x7b-32768` | 46.7B params | Fallback Reasoning (API) | Groq |
-| **BERTopic** | Varies | Topic Discovery | BERTopic |
+```powershell
+$env:GROQ_API_KEY="your_groq_api_key"
+```
 
----
+PowerShell, persist for future sessions:
+
+```powershell
+setx GROQ_API_KEY "your_groq_api_key"
+```
+
+## How To Run
+
+### Fastest option
+
+From the project folder, run just one command:
+
+```powershell
+python start_resa.py
+```
+
+Or on Windows:
+
+```powershell
+.\start_resa.cmd
+```
+
+What it does:
+
+- starts the local frontend server if it is not already running
+- reuses a healthy running server if one already exists
+- picks up the saved Groq key automatically
+- waits until the app is reachable
+- opens the browser to `http://127.0.0.1:8000`
+
+### Option 1: Run the CLI pipeline
+
+Analyze a PDF:
+
+```powershell
+python main.py .\paperDCRE-1.pdf
+```
+
+Analyze a LaTeX file:
+
+```powershell
+python main.py .\paper.tex --type latex
+```
+
+Analyze a text file:
+
+```powershell
+python main.py .\paper.txt --type text
+```
+
+Skip Groq:
+
+```powershell
+python main.py .\paperDCRE-1.pdf --skip-groq
+```
+
+Skip transformer-heavy phases:
+
+```powershell
+python main.py .\paperDCRE-1.pdf --skip-models
+```
+
+### Option 2: Run the web dashboard
+
+```powershell
+python frontend_server.py
+```
+
+Then open:
+
+- `http://127.0.0.1:8000`
+
+## API Surface Used By The Frontend
+
+| Method | Route | Purpose |
+|---|---|---|
+| `GET` | `/` | Serves the dashboard |
+| `POST` | `/api/analyze` | Accepts uploaded PDF and starts a job |
+| `GET` | `/api/jobs/<job_id>` | Returns live job state |
+| `GET` | `/api/report/latest` | Returns the latest completed report |
+| `GET` | `/results/<file>` | Serves generated charts and artifacts |
+
+## Configuration
+
+Central configuration lives in `config.py`.
+
+Important values:
+
+| Name | Meaning |
+|---|---|
+| `SUMMARIZER_MODEL` | Abstractive summarization model |
+| `ZERO_SHOT_MODEL` | Zero-shot classification model |
+| `SENTENCE_TRANSFORMER_MODEL` | Embedding model |
+| `GROQ_MODEL` | Primary Groq model |
+| `GROQ_FALLBACK_MODEL` | Secondary Groq model |
+| `CHUNK_SIZE` | Long-document chunk size |
+| `CHUNK_OVERLAP` | Chunk overlap |
+| `TOP_K_KEYWORDS` | Final number of surfaced keywords |
+| `TOP_K_SUMMARY_SENTENCES` | Extractive summary sentence count |
+| `CUDA_MEMORY_FRACTION` | PyTorch GPU memory fraction |
+| `LOW_VRAM_THRESHOLD_GB` | Threshold for low-VRAM mode |
+
+## GPU And Performance Notes
+
+RESA_AI supports both CPU and GPU execution, but a GPU does not make every phase instant. Some steps remain CPU-heavy or I/O-bound, and the first run can be slow because models may need to download.
+
+Current performance behavior:
+
+- PyTorch selects CUDA automatically if available
+- Low-VRAM mode activates automatically below 6 GB GPU memory
+- In low-VRAM mode:
+  - abstractive summarization uses shorter inputs and cheaper generation settings
+  - zero-shot section classification is skipped in favor of keyword fallback
+  - similarity embedding batch size is reduced
+- The frontend only allows one active job at a time to avoid GPU contention
+
+## Troubleshooting
+
+### The app says GPU is not available
+
+That usually means PyTorch cannot see CUDA, not that the machine has no GPU. Check:
+
+- `python -c "import torch; print(torch.__version__, torch.cuda.is_available(), torch.version.cuda)"`
+
+### Transformer phase feels slow
+
+That phase includes several expensive substeps:
+
+- long-document chunking
+- summary generation
+- section classification
+- semantic similarity
+
+On low-VRAM GPUs this is expected to be the slowest stage, even when the system is working correctly.
+
+### Groq analysis is missing
+
+Check that:
+
+- `groq` is installed
+- `GROQ_API_KEY` is set in the environment used to launch the app
+
+### Frontend shows no report
+
+Check whether:
+
+- `results/report.json` exists
+- the server is running on `127.0.0.1:8000`
+- a job has completed successfully
+
+## Notes On Included Sample Content
+
+This repository includes sample output files and a sample paper for demonstration. If you add third-party papers, datasets, or external assets, their original license and copyright terms may still apply.
 
 ## License
 
-This project is for research and educational purposes.
-
----
-
-<p align="center">
-  Built with 🔬 by <strong>RESA_AI</strong> — Turning Math Papers into Actionable Insights
-</p>
+This project is licensed under the MIT License. See `LICENSE` for details.

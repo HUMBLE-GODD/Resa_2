@@ -9,7 +9,16 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import re
 import torch
 from typing import Dict, List
-from config import DEVICE, SECTION_LABELS, ZERO_SHOT_MODEL
+from config import (
+    DEVICE,
+    DEVICE_TYPE,
+    SECTION_LABELS,
+    ZERO_SHOT_MODEL,
+    LOW_MEMORY_MODE,
+    TRANSFORMER_TORCH_DTYPE,
+    ZERO_SHOT_PIPELINE_DEVICE,
+    clear_device_cache,
+)
 
 
 # Keyword rules for fallback classification (no model download needed)
@@ -44,18 +53,20 @@ class SciBERTClassifier:
             return
         
         print(f"  Loading zero-shot classifier: {ZERO_SHOT_MODEL}")
+
+        if LOW_MEMORY_MODE and DEVICE_TYPE != "cpu":
+            print("  [INFO] Low-memory mode enabled; skipping zero-shot classifier and using keyword fallback.")
+            self._use_fallback = True
+            return
         
         try:
             from transformers import pipeline
             
-            device_id = 0 if DEVICE.type == "cuda" else -1
-            dtype = torch.float16 if DEVICE.type == "cuda" else torch.float32
-            
             self._classifier = pipeline(
                 "zero-shot-classification",
                 model=ZERO_SHOT_MODEL,
-                device=device_id,
-                dtype=dtype,
+                device=ZERO_SHOT_PIPELINE_DEVICE,
+                model_kwargs={"torch_dtype": TRANSFORMER_TORCH_DTYPE},
             )
             print(f"  [OK] Classifier loaded on {DEVICE}")
         except Exception as e:
@@ -95,9 +106,7 @@ class SciBERTClassifier:
             classifications.append(result)
             print(f"  Section '{title[:40]}' -> {result['predicted_label']} ({result['confidence']:.0%})")
         
-        # Clean GPU memory
-        if DEVICE.type == "cuda":
-            torch.cuda.empty_cache()
+        clear_device_cache(DEVICE)
         
         data["classifications"] = classifications
         
@@ -169,9 +178,8 @@ class SciBERTClassifier:
         if self._classifier is not None:
             del self._classifier
             self._classifier = None
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-            print("  [OK] Classifier unloaded from memory")
+            clear_device_cache(DEVICE)
+        print("  [OK] Classifier unloaded from memory")
 
 
 if __name__ == "__main__":

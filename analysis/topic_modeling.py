@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np
 from typing import Dict, List
-from config import DEVICE, CACHE_DIR
+from config import DEVICE, SENTENCE_TRANSFORMER_MODEL, LOW_MEMORY_MODE
 
 
 class TopicModeler:
@@ -54,13 +54,13 @@ class TopicModeler:
             from sentence_transformers import SentenceTransformer
             
             # Use cached embeddings if available
-            embedding_model = SentenceTransformer("all-MiniLM-L6-v2", device=str(DEVICE))
+            embedding_model = SentenceTransformer(SENTENCE_TRANSFORMER_MODEL, device=str(DEVICE))
             
             # Configure BERTopic
             self._model = BERTopic(
                 embedding_model=embedding_model,
                 nr_topics="auto",
-                min_topic_size=3,
+                min_topic_size=4 if LOW_MEMORY_MODE else 3,
                 verbose=False,
             )
             

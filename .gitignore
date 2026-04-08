@@ -19,6 +19,8 @@ ENV/
 cache/
 .cache/
 data/uploads/
+data/backend_settings.json
+data/frontend_server.pid
 .codex-publish-resa2/
 frontend-server*.log
 

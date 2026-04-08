@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import torch
 import numpy as np
 from typing import Dict, List
-from config import DEVICE, SENTENCE_TRANSFORMER_MODEL, CACHE_DIR
+from config import DEVICE, SENTENCE_TRANSFORMER_MODEL, CACHE_DIR, EMBED_BATCH_SIZE, clear_device_cache
 
 
 class SemanticSimilarity:
@@ -68,7 +68,7 @@ class SemanticSimilarity:
         with torch.no_grad():
             embeddings = self._model.encode(
                 texts,
-                batch_size=16,
+                batch_size=EMBED_BATCH_SIZE,
                 show_progress_bar=False,
                 convert_to_numpy=True,
                 normalize_embeddings=True,
@@ -107,9 +107,7 @@ class SemanticSimilarity:
         print(f"  ✓ Embedded {len(texts)} sections ({embeddings.shape[1]}D)")
         print(f"  ✓ Most similar: {similar_pairs[0]['section_a'][:30]} ↔ {similar_pairs[0]['section_b'][:30]} ({similar_pairs[0]['similarity']:.3f})" if similar_pairs else "  No pairs")
         
-        # Clean GPU memory
-        if DEVICE.type == "cuda":
-            torch.cuda.empty_cache()
+        clear_device_cache(DEVICE)
         
         return data
 
@@ -150,8 +148,7 @@ class SemanticSimilarity:
         if self._model is not None:
             del self._model
             self._model = None
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            clear_device_cache(DEVICE)
 
 
 if __name__ == "__main__":

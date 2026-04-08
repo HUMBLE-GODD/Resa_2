@@ -20,6 +20,8 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
+from config import DEVICE_TYPE, DEVICE_NAME, LOW_MEMORY_MODE, GPU_TOTAL_MEMORY_GB
+from runtime_settings import build_subprocess_env, get_stored_groq_api_key, mask_secret, set_groq_api_key
 
 
 ROOT = Path(__file__).resolve().parent
@@ -77,11 +79,46 @@ def update_phase(job: Job, phase_index: int, status: str, message: str) -> None:
             job.status = "failed"
 
 
+def set_job_message(job: Job, message: str) -> None:
+    with JOB_LOCK:
+        job.message = message
+
+
+def get_active_job() -> Job | None:
+    with JOB_LOCK:
+        for job in JOBS.values():
+            if job.status in {"queued", "running"}:
+                return job
+    return None
+
+
 def load_latest_report() -> dict:
     report_path = RESULTS_DIR / "report.json"
     if not report_path.exists():
         raise FileNotFoundError("results/report.json not found")
     return json.loads(report_path.read_text(encoding="utf-8"))
+
+
+def get_settings_payload() -> dict:
+    """Return frontend-safe runtime and settings status."""
+    stored_key = get_stored_groq_api_key()
+    env_key = os.environ.get("GROQ_API_KEY", "").strip()
+    active_key = stored_key or env_key
+    source = "backend" if stored_key else ("environment" if env_key else "missing")
+
+    return {
+        "groq": {
+            "configured": bool(active_key),
+            "masked_key": mask_secret(active_key),
+            "source": source,
+        },
+        "runtime": {
+            "device_type": DEVICE_TYPE,
+            "device_name": DEVICE_NAME,
+            "low_memory_mode": LOW_MEMORY_MODE,
+            "memory_gb": round(GPU_TOTAL_MEMORY_GB, 1) if GPU_TOTAL_MEMORY_GB else None,
+        },
+    }
 
 
 def run_pipeline(job_id: str) -> None:
@@ -90,10 +127,11 @@ def run_pipeline(job_id: str) -> None:
         job.status = "running"
         job.message = "Launching RESA_AI pipeline."
 
-    command = [sys.executable, "main.py", job.input_path]
+    command = [sys.executable, "-u", "main.py", job.input_path]
     process = subprocess.Popen(
         command,
         cwd=ROOT,
+        env=build_subprocess_env(),
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -123,6 +161,8 @@ def run_pipeline(job_id: str) -> None:
             update_phase(job, current_phase, "completed", f"{job.phases[current_phase]['title']} completed.")
         elif clean.startswith("[FAIL] Phase") and current_phase is not None:
             update_phase(job, current_phase, "failed", clean)
+        elif current_phase is not None and clean and not clean.startswith(("=", "-")):
+            set_job_message(job, clean)
 
     return_code = process.wait()
     with JOB_LOCK:
@@ -169,6 +209,9 @@ class ResaHandler(BaseHTTPRequestHandler):
             except FileNotFoundError:
                 self.send_error(HTTPStatus.NOT_FOUND, "No report available yet")
             return
+        if path == "/api/settings":
+            self.serve_json(get_settings_payload())
+            return
         if path.startswith("/api/jobs/"):
             job_id = path.rsplit("/", 1)[-1]
             with JOB_LOCK:
@@ -181,6 +224,10 @@ class ResaHandler(BaseHTTPRequestHandler):
         self.send_error(HTTPStatus.NOT_FOUND, "Not found")
 
     def do_POST(self) -> None:
+        if self.path == "/api/settings/groq":
+            self.handle_groq_settings_update()
+            return
+
         if self.path != "/api/analyze":
             self.send_error(HTTPStatus.NOT_FOUND, "Not found")
             return
@@ -213,10 +260,53 @@ class ResaHandler(BaseHTTPRequestHandler):
 
         job = Job(job_id=job_id, filename=filename, input_path=str(input_path), phases=make_phase_list())
         with JOB_LOCK:
+            active_job = next((job for job in JOBS.values() if job.status in {"queued", "running"}), None)
+            if active_job is not None:
+                try:
+                    os.remove(input_path)
+                except OSError:
+                    pass
+                self.serve_json(
+                    {
+                        "error": "analysis_in_progress",
+                        "message": f"Another paper is already being analyzed: {active_job.filename}",
+                        "active_job_id": active_job.job_id,
+                    },
+                    status=HTTPStatus.CONFLICT,
+                )
+                return
             JOBS[job_id] = job
 
         threading.Thread(target=run_pipeline, args=(job_id,), daemon=True).start()
         self.serve_json({"job_id": job_id, "status": "queued"}, status=HTTPStatus.ACCEPTED)
+
+    def handle_groq_settings_update(self) -> None:
+        """Save or clear the Groq API key from the frontend."""
+        try:
+            content_length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            content_length = 0
+
+        raw_body = self.rfile.read(content_length) if content_length > 0 else b"{}"
+        try:
+            payload = json.loads(raw_body.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            self.send_error(HTTPStatus.BAD_REQUEST, "Expected a valid JSON body")
+            return
+
+        if not isinstance(payload, dict):
+            self.send_error(HTTPStatus.BAD_REQUEST, "Expected a JSON object")
+            return
+
+        api_key = str(payload.get("groq_api_key", "") or "").strip()
+        set_groq_api_key(api_key)
+
+        if api_key:
+            os.environ["GROQ_API_KEY"] = api_key
+        else:
+            os.environ.pop("GROQ_API_KEY", None)
+
+        self.serve_json(get_settings_payload())
 
     def serve_static(self, root: Path, relative_path: str) -> None:
         safe_path = (root / relative_path).resolve()

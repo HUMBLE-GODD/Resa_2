@@ -11,7 +11,15 @@ import re
 import numpy as np
 from typing import Dict, List
 from sklearn.feature_extraction.text import TfidfVectorizer
-from config import DEVICE, SUMMARIZER_MODEL, TOP_K_SUMMARY_SENTENCES
+from config import (
+    DEVICE,
+    DEVICE_TYPE,
+    SUMMARIZER_MODEL,
+    TOP_K_SUMMARY_SENTENCES,
+    LOW_MEMORY_MODE,
+    TRANSFORMER_TORCH_DTYPE,
+    clear_device_cache,
+)
 
 
 class ResearchSummarizer:
@@ -35,12 +43,14 @@ class ResearchSummarizer:
         
         try:
             self._tokenizer_abs = AutoTokenizer.from_pretrained(SUMMARIZER_MODEL)
-            dtype = torch.float16 if DEVICE.type == "cuda" else torch.float32
             self._model = AutoModelForSeq2SeqLM.from_pretrained(
-                SUMMARIZER_MODEL, dtype=dtype
+                SUMMARIZER_MODEL,
+                torch_dtype=TRANSFORMER_TORCH_DTYPE,
             ).to(DEVICE)
             self._model.eval()
             print(f"  [OK] Summarizer loaded on {DEVICE}")
+            if LOW_MEMORY_MODE:
+                print("  [INFO] Low-memory summarization mode is active.")
         except Exception as e:
             print(f"  [WARN] Summarizer load failed: {e}")
             self._model = None
@@ -151,7 +161,12 @@ class ResearchSummarizer:
             return "Abstractive summarization model unavailable."
         
         # Use abstract + intro as input for abstractive summary
-        input_text = abstract if abstract and len(abstract) > 100 else text
+        if abstract and len(abstract) > 100:
+            input_text = abstract
+        elif LOW_MEMORY_MODE:
+            input_text = text[:1200]
+        else:
+            input_text = text
         
         # Truncate to fit model context
         input_text = input_text[:2000]
@@ -167,26 +182,24 @@ class ResearchSummarizer:
                 return_tensors="pt"
             ).to(DEVICE)
             
-            # CPU: use greedy decoding for speed (~1 min vs 30+ min with beam search)
-            # GPU: use full beam search for quality
-            is_gpu = DEVICE.type == "cuda"
+            use_accelerator = DEVICE_TYPE != "cpu"
+            use_low_memory_settings = LOW_MEMORY_MODE
             
             with torch.no_grad():
                 summary_ids = self._model.generate(
                     inputs["input_ids"],
-                    max_length=150 if not is_gpu else 250,
-                    min_length=30 if not is_gpu else 60,
-                    num_beams=4 if is_gpu else 1,
+                    max_length=150 if not use_accelerator else (180 if use_low_memory_settings else 250),
+                    min_length=30 if not use_accelerator else (40 if use_low_memory_settings else 60),
+                    num_beams=1 if (not use_accelerator or use_low_memory_settings) else 4,
                     do_sample=False,
-                    length_penalty=1.5 if is_gpu else 1.0,
+                    length_penalty=1.1 if use_low_memory_settings else (1.5 if use_accelerator else 1.0),
                     early_stopping=True,
                 )
             
             summary = self._tokenizer_abs.decode(summary_ids[0], skip_special_tokens=True)
             
-            # Clean GPU memory
-            if is_gpu:
-                torch.cuda.empty_cache()
+            if use_accelerator:
+                clear_device_cache(DEVICE)
             
             return summary
             
@@ -232,8 +245,7 @@ class ResearchSummarizer:
         if self._tokenizer_abs is not None:
             del self._tokenizer_abs
             self._tokenizer_abs = None
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        clear_device_cache(DEVICE)
         print("  [OK] Summarizer unloaded from memory")
 
 

@@ -21,9 +21,16 @@ const pipelineProgressBar = document.getElementById("pipelineProgressBar");
 const pipelineLabel = document.getElementById("pipelineLabel");
 const pipelineHint = document.getElementById("pipelineHint");
 const heroStatus = document.getElementById("heroStatus");
+const groqStatus = document.getElementById("groqStatus");
+const runtimeStatus = document.getElementById("runtimeStatus");
+const groqKeyInput = document.getElementById("groqKeyInput");
+const saveGroqButton = document.getElementById("saveGroqButton");
+const clearGroqButton = document.getElementById("clearGroqButton");
+const groqNote = document.getElementById("groqNote");
 
 let selectedFile = null;
 let pollingHandle = null;
+let groqSettings = { configured: false };
 
 function renderPhases(job = null) {
   const items = (job?.phases || PHASES.map((phase) => ({ ...phase, status: "idle" })))
@@ -223,6 +230,63 @@ async function requestLatestReport() {
   return response.json();
 }
 
+async function requestSettings() {
+  const response = await fetch("/api/settings");
+  if (!response.ok) throw new Error("Unable to load settings");
+  return response.json();
+}
+
+function renderSettings(payload) {
+  const groq = payload?.groq || {};
+  const runtime = payload?.runtime || {};
+  groqSettings = groq;
+
+  const runtimeBits = [];
+  if (runtime.device_name) {
+    runtimeBits.push(runtime.device_name);
+  }
+  if (runtime.device_type) {
+    runtimeBits.push(`backend: ${runtime.device_type}`);
+  }
+  if (typeof runtime.memory_gb === "number") {
+    runtimeBits.push(`${runtime.memory_gb.toFixed(1)} GB`);
+  }
+  if (runtime.low_memory_mode) {
+    runtimeBits.push("low-memory mode");
+  }
+
+  runtimeStatus.textContent = runtimeBits.length
+    ? `Runtime detected for this backend: ${runtimeBits.join(" • ")}.`
+    : "Runtime detection is not available yet.";
+
+  if (groq.configured) {
+    groqStatus.textContent = "Groq ready";
+    const source = groq.source === "backend" ? "saved in the backend" : "available from the environment";
+    groqNote.textContent = groq.masked_key
+      ? `Groq key ${groq.masked_key} is ${source}. New analysis jobs will use it automatically.`
+      : `Groq is configured and ${source}.`;
+    groqKeyInput.placeholder = "Replace the saved Groq API key";
+  } else {
+    groqStatus.textContent = "Groq missing";
+    groqNote.textContent = "Add a Groq API key to enable Phase 6 LLM insights. The rest of the pipeline can still run without it.";
+    groqKeyInput.placeholder = "Paste Groq API key to enable Phase 6 insights";
+  }
+}
+
+async function saveGroqKey(apiKey) {
+  const response = await fetch("/api/settings/groq", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ groq_api_key: apiKey })
+  });
+
+  if (!response.ok) {
+    throw new Error("Unable to save Groq key");
+  }
+
+  return response.json();
+}
+
 function setPipeline(job) {
   renderPhases(job);
   pipelineStatus.classList.remove("hidden");
@@ -261,12 +325,27 @@ async function startAnalysis() {
   heroStatus.textContent = "Queued";
   pipelineStatus.classList.remove("hidden");
   pipelineLabel.textContent = "Submitting paper";
-  pipelineHint.textContent = "Your PDF is being handed to the backend pipeline.";
+  pipelineHint.textContent = groqSettings.configured
+    ? "Your PDF is being handed to the backend pipeline."
+    : "Your PDF is being handed to the backend pipeline. Groq is not configured yet, so Phase 6 insights may be skipped.";
   const response = await fetch("/api/analyze", { method: "POST", body: formData });
   if (!response.ok) {
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch (error) {
+      payload = null;
+    }
+    if (response.status === 409 && payload?.active_job_id) {
+      heroStatus.textContent = "Busy";
+      pipelineLabel.textContent = "Analysis already running";
+      pipelineHint.textContent = payload.message || "Another paper is already being analyzed.";
+      pollJob(payload.active_job_id);
+      return;
+    }
     heroStatus.textContent = "Error";
     pipelineLabel.textContent = "Upload failed";
-    pipelineHint.textContent = "The analysis request could not be started.";
+    pipelineHint.textContent = payload?.message || "The analysis request could not be started.";
     return;
   }
   const payload = await response.json();
@@ -292,6 +371,43 @@ fileInput.addEventListener("change", () => {
 });
 
 analyzeButton.addEventListener("click", startAnalysis);
+saveGroqButton.addEventListener("click", async () => {
+  const apiKey = groqKeyInput.value.trim();
+  if (!apiKey) {
+    groqNote.textContent = "Paste a Groq API key before saving it.";
+    groqKeyInput.focus();
+    return;
+  }
+
+  saveGroqButton.disabled = true;
+  groqNote.textContent = "Saving Groq API key to the backend...";
+
+  try {
+    const settings = await saveGroqKey(apiKey);
+    groqKeyInput.value = "";
+    renderSettings(settings);
+  } catch (error) {
+    groqNote.textContent = "The Groq API key could not be saved right now.";
+  } finally {
+    saveGroqButton.disabled = false;
+  }
+});
+
+clearGroqButton.addEventListener("click", async () => {
+  clearGroqButton.disabled = true;
+  groqNote.textContent = "Clearing the saved Groq API key...";
+
+  try {
+    const settings = await saveGroqKey("");
+    groqKeyInput.value = "";
+    renderSettings(settings);
+  } catch (error) {
+    groqNote.textContent = "The saved Groq API key could not be cleared right now.";
+  } finally {
+    clearGroqButton.disabled = false;
+  }
+});
+
 loadDemoButton.addEventListener("click", async () => {
   try {
     const report = await requestLatestReport();
@@ -305,4 +421,8 @@ loadDemoButton.addEventListener("click", async () => {
 
 setupSectionNav();
 renderPhases();
+requestSettings().then(renderSettings).catch(() => {
+  groqStatus.textContent = "Unavailable";
+  runtimeStatus.textContent = "Backend settings could not be loaded.";
+});
 requestLatestReport().then(renderAnalysis).catch(() => {});
